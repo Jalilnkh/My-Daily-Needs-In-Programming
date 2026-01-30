@@ -1,0 +1,5 @@
+clear
+ls
+ls -l # showing permission of files
+echo $ this is just a test script$
+echo $ to exist from vim with writing mode use escape then :wq$
