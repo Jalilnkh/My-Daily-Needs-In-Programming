@@ -12,6 +12,7 @@ So this is just archive of my daily usage feel free to use it or just read it.
         - write scripts
         - To save:
                 - Use escspe then :wq
+        - note: using .sh would make you file readable to be specified that this is bash file.
 
 - 1- How to make bash script excutionable:
 
