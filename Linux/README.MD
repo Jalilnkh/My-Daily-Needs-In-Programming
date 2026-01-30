@@ -11,7 +11,7 @@ So this is just archive of my daily usage feel free to use it or just read it.
         - use vim commend. if it is not installed on Linux use sudo apt-get install vim 
         - write scripts
         - To save:
-                - Use escape + w + q
+                - Use escspe then :wq
 
 - 1- How to make bash script excutionable:
 
