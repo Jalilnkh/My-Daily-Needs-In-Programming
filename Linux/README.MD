@@ -12,7 +12,7 @@ So this is just archive of my daily usage feel free to use it or just read it.
         - write scripts
         - To save:
                 - Use escape + w + q
-                
+
 - 1- How to make bash script excutionable:
 
         - chmod +x b-script_name : make file excutable 
@@ -20,7 +20,7 @@ So this is just archive of my daily usage feel free to use it or just read it.
 
 - 2 - How to run bash script, there are three way to do it:
 
-    - bash bash-script-name
-    - sh bash-script-name
-    - ./bash-script-name
+        - bash bash-script-name
+        - sh bash-script-name
+        - ./bash-script-name
 
