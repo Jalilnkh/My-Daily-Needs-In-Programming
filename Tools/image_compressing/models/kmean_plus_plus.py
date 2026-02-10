@@ -1,12 +1,14 @@
 # The code is written by Jalil Nourmohammadi Khiarak and all copy rights is reserved.
 
 import numpy as np
+from image_compressing.utils.plots import plot_kmean_input_data
 
 def kmeans_plus_plus_init(X, k):
     """
     Initializes centroids using the K-means++ algorithm.
     """
     n_samples, n_features = X.shape
+    plot_kmean_input_data(X)  # Visualize the input data
     # 1. Randomly pick the first centroid
     centroids = [X[np.random.randint(n_samples)]]
 
