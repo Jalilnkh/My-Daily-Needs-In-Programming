@@ -1,3 +1,5 @@
+# The code is written by Jalil Nourmohammadi Khiarak and all copy rights is reserved.
+
 import cv2
 import numpy as np
 

@@ -1,3 +1,5 @@
+# The code is written by Jalil Nourmohammadi Khiarak and all copy rights is reserved.
+
 import numpy as np
 
 def kmeans_plus_plus_init(X, k):
