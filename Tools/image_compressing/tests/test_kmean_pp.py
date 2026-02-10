@@ -2,6 +2,7 @@
 
 import unittest
 import numpy as np
+from ..models.kmean_plus_plus import kmeans_plus_plus_init, kmeans
 
 class TestKMeans(unittest.TestCase):
     def setUp(self):
