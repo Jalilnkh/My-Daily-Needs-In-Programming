@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'self'; script-src 'self'" />
+    <title>Screen Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <div class="brand-mark">S</div>
+        <div><h1>Screen Studio</h1><p>Record clearly. Share confidently.</p></div>
+        <div id="statusPill" class="status"><i></i><span>Ready</span></div>
+      </header>
+
+      <section class="workspace">
+        <div class="stage-panel">
+          <div id="stage" class="stage">
+            <canvas id="previewCanvas"></canvas>
+            <div id="emptyState" class="empty-state">
+              <div class="screen-icon">▣</div>
+              <h2>Choose what you want to record</h2>
+              <p>Select a screen or app window to begin your preview.</p>
+              <button id="chooseSourceHero" class="primary">Choose screen</button>
+            </div>
+            <div id="regionBox" class="region-box hidden"><span>Drag to move · resize from corner</span><b></b></div>
+          </div>
+          <div class="stage-footer">
+            <span id="resolutionLabel">No source selected</span>
+            <span id="timer">00:00:00</span>
+          </div>
+        </div>
+
+        <aside>
+          <section class="control-card">
+            <div class="section-title"><span>Capture source</span><button id="refreshSources" class="text-button">Refresh</button></div>
+            <button id="sourceButton" class="source-button"><span class="source-glyph">▣</span><span><b>Select a screen or window</b><small>Nothing selected</small></span><span>›</span></button>
+            <label class="toggle-row"><span><b>Capture a region</b><small>Crop to a custom area</small></span><input id="regionToggle" type="checkbox" /><i></i></label>
+          </section>
+
+          <section class="control-card">
+            <div class="section-title"><span>Audio</span></div>
+            <label class="toggle-row"><span><b>Microphone</b><small id="micName">Default input</small></span><input id="micToggle" type="checkbox" checked /><i></i></label>
+            <label class="toggle-row"><span><b>System audio</b><small>Computer sounds (Windows)</small></span><input id="systemToggle" type="checkbox" checked /><i></i></label>
+          </section>
+
+          <section class="control-card">
+            <div class="section-title"><span>Camera overlay</span></div>
+            <label class="toggle-row"><span><b>Show camera</b><small>Circular picture-in-picture</small></span><input id="cameraToggle" type="checkbox" /><i></i></label>
+            <div class="inline-options"><label>Size<select id="cameraSize"><option value="0.16">Small</option><option value="0.21" selected>Medium</option><option value="0.27">Large</option></select></label><label>Position<select id="cameraPosition"><option value="br">Bottom right</option><option value="bl">Bottom left</option><option value="tr">Top right</option><option value="tl">Top left</option></select></label></div>
+          </section>
+
+          <section class="control-card compact">
+            <div class="section-title"><span>Quality</span></div>
+            <div class="inline-options"><label>Preset<select id="quality"><option value="6000000">Standard · 6 Mbps</option><option value="12000000" selected>High · 12 Mbps</option><option value="24000000">Ultra · 24 Mbps</option></select></label><label>Frame rate<select id="fps"><option>30</option><option selected>60</option></select></label></div>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="action-bar">
+        <p id="hint">Select a source to start recording</p>
+        <button id="recordButton" class="record-button" disabled><i></i><span>Start recording</span></button>
+      </footer>
+    </main>
+
+    <dialog id="sourceDialog">
+      <div class="dialog-header"><div><h2>Choose a screen or window</h2><p>Your selection will appear in the preview.</p></div><button id="closeDialog">×</button></div>
+      <div id="sourceGrid" class="source-grid"></div>
+    </dialog>
+    <video id="screenVideo" muted playsinline></video>
+    <video id="cameraVideo" muted playsinline></video>
+    <script src="app.js"></script>
+  </body>
+</html>
