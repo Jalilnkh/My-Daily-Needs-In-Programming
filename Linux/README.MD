@@ -6,6 +6,14 @@ So this is just archive of my daily usage feel free to use it or just read it.
 
 # Some minor info:
 
+- 1- How to create bash script file:
+
+        - use vim commend. if it is not installed on Linux use sudo apt-get install vim 
+        - write scripts
+        - To save:
+                - Use escspe then :wq
+        - note: using .sh would make you file readable to be specified that this is bash file.
+
 - 1- How to make bash script excutionable:
 
         - chmod +x b-script_name : make file excutable 
@@ -13,7 +21,7 @@ So this is just archive of my daily usage feel free to use it or just read it.
 
 - 2 - How to run bash script, there are three way to do it:
 
-    - bash bash-script-name
-    - sh bash-script-name
-    - ./bash-script-name
+        - bash bash-script-name
+        - sh bash-script-name
+        - ./bash-script-name
 

@@ -1,0 +1,31 @@
+{
+  "name": "screen-studio",
+  "version": "1.0.0",
+  "description": "High-quality Windows screen recorder with region capture, microphone, system audio, and webcam overlay.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.dail.needs.screenstudio",
+    "productName": "Screen Studio",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
