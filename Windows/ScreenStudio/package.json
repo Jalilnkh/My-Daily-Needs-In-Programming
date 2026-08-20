@@ -18,6 +18,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "region-preload.js",
       "renderer/**/*"
     ],
     "win": {

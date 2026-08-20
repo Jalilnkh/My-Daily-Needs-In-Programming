@@ -23,9 +23,11 @@ The installer and portable executable are created in `dist/`. Build the distribu
 
 Recordings use VP9/Opus WebM at 6, 12, or 24 Mbps and up to 60 FPS. WebM is used because Chromium can encode it reliably in real time without native codecs. Files play in modern browsers, VLC, and current Windows media apps; they can be converted to MP4 afterward with FFmpeg if required.
 
+Video chunks are continuously written to a temporary file instead of being held in memory. When recording stops, Screen Studio waits for the encoder's final chunk, syncs the complete file to disk, and then asks where to save it. Long recordings can take some time to finalize or move; keep the app open until the saved-path message appears.
+
 ## Notes
 
 - System audio loopback is provided by Electron on Windows.
-- The final recording resolution matches the selected source or selected crop region.
+- Region selection opens as a full-screen overlay on the chosen display; the final recording resolution matches that selected area.
 - Microphone processing enables echo cancellation, noise suppression, and automatic gain control.
 - A stopped screen share automatically stops and offers to save an active recording.
