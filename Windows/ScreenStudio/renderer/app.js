@@ -3,7 +3,7 @@ const screenVideo = $('#screenVideo');
 const cameraVideo = $('#cameraVideo');
 const canvas = $('#previewCanvas');
 const ctx = canvas.getContext('2d');
-const state = { screenStream:null, cameraStream:null, micStream:null, recorder:null, chunks:[], drawing:false, startedAt:0, timer:null, region:{ x:.1,y:.1,w:.8,h:.8 }, drag:null };
+const state = { screenStream:null, cameraStream:null, micStream:null, recorder:null, recordingId:null, writeChain:Promise.resolve(), writeError:null, currentSource:null, drawing:false, startedAt:0, timer:null, region:{ x:.1,y:.1,w:.8,h:.8 } };
 
 async function openSources() {
   const dialog = $('#sourceDialog');
@@ -28,6 +28,7 @@ async function selectSource(source, dialog) {
   await window.screenStudio.selectSource(source.id);
   try {
     state.screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: Number($('#fps').value) }, audio: true });
+    state.currentSource = source;
     screenVideo.srcObject = state.screenStream;
     await screenVideo.play();
     const track = state.screenStream.getVideoTracks()[0];
@@ -89,30 +90,73 @@ async function startRecording() {
   if (!state.screenStream) return;
   $('#recordButton').disabled = true;
   try {
+    const sourceVideoTrack = state.screenStream.getVideoTracks()[0];
+    if (!sourceVideoTrack || sourceVideoTrack.readyState !== 'live') throw new Error('The selected screen is no longer producing video');
+    const recordingId = await window.screenStudio.startRecordingFile();
+    state.recordingId = recordingId;
     const audioContext = new AudioContext();
+    await audioContext.resume();
     const destination = audioContext.createMediaStreamDestination();
     if ($('#systemToggle').checked && state.screenStream.getAudioTracks().length) audioContext.createMediaStreamSource(new MediaStream(state.screenStream.getAudioTracks())).connect(destination);
     if ($('#micToggle').checked) { state.micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});audioContext.createMediaStreamSource(state.micStream).connect(destination); }
-    const fps=Number($('#fps').value), output=canvas.captureStream(fps);
+    const fps=Number($('#fps').value);
+    // Record the native display track when no compositing is requested. This
+    // avoids making ordinary full-screen recordings depend on canvas paints.
+    // Region and camera recordings still use the compositor.
+    const needsCompositor=$('#regionToggle').checked||$('#cameraToggle').checked;
+    const output=needsCompositor?canvas.captureStream(fps):new MediaStream([sourceVideoTrack.clone()]);
+    const outputVideoTrack=output.getVideoTracks()[0];
+    if (!outputVideoTrack || outputVideoTrack.readyState !== 'live') throw new Error('Could not create a live video track for the recording');
     destination.stream.getAudioTracks().forEach(track=>output.addTrack(track));
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp8,opus';
-    state.chunks=[];state.recorder=new MediaRecorder(output,{mimeType,videoBitsPerSecond:Number($('#quality').value),audioBitsPerSecond:192000});
-    state.recorder.ondataavailable=e=>e.data.size&&state.chunks.push(e.data);
-    state.recorder.onstop=async()=>{ const blob=new Blob(state.chunks,{type:mimeType});const path=await window.screenStudio.saveRecording(await blob.arrayBuffer());await stopTracks(state.micStream);state.micStream=null;await audioContext.close();setRecordingUi(false);$('#hint').textContent=path?`Saved to ${path}`:'Recording was not saved'; };
+    state.writeChain=Promise.resolve();state.writeError=null;
+    state.recorder=new MediaRecorder(output,{mimeType,videoBitsPerSecond:Number($('#quality').value),audioBitsPerSecond:192000});
+    state.recorder.ondataavailable=e=>{
+      if (!e.data.size) return;
+      state.writeChain = state.writeChain.then(async()=>window.screenStudio.appendRecordingChunk(recordingId,await e.data.arrayBuffer())).catch(error=>{state.writeError=error;});
+    };
+    state.recorder.onerror=event=>{state.writeError=event.error||new Error('The video encoder stopped unexpectedly');};
+    state.recorder.onstop=async()=>{
+      $('#hint').textContent='Finalizing every recorded frame… please wait';
+      try {
+        await state.writeChain;
+        if (state.writeError) throw state.writeError;
+        const result=await window.screenStudio.finishRecordingFile(recordingId);
+        $('#hint').textContent=result?`Saved ${(result.bytes/1073741824).toFixed(2)} GB to ${result.path}`:'Recording was not saved';
+      } catch(error) {
+        await window.screenStudio.abortRecordingFile(recordingId);
+        $('#hint').textContent=`Could not save the complete recording: ${error.message}`;
+      } finally {
+        output.getTracks().forEach(track=>track.stop());
+        await stopTracks(state.micStream);state.micStream=null;
+        await audioContext.close();state.recordingId=null;state.recorder=null;setRecordingUi(false);
+      }
+    };
     state.recorder.start(1000);state.startedAt=Date.now();setRecordingUi(true);
-  } catch(error) { $('#hint').textContent=`Could not start: ${error.message}`; $('#recordButton').disabled=false; }
+  } catch(error) { if(state.recordingId)await window.screenStudio.abortRecordingFile(state.recordingId);state.recordingId=null;$('#hint').textContent=`Could not start: ${error.message}`;$('#recordButton').disabled=false; }
 }
 
-function stopRecording(){ if(state.recorder?.state==='recording') state.recorder.stop(); }
-function setRecordingUi(active){ const button=$('#recordButton');button.disabled=false;button.classList.toggle('stop',active);button.querySelector('span').textContent=active?'Stop & save':'Start recording';$('#statusPill').classList.toggle('recording',active);$('#statusPill span').textContent=active?'Recording':'Ready';clearInterval(state.timer);if(active){state.timer=setInterval(updateTimer,250);updateTimer();}else{$('#timer').textContent='00:00:00';} }
+function stopRecording(){ if(state.recorder?.state==='recording'){state.recorder.requestData();state.recorder.stop();$('#recordButton').disabled=true;$('#hint').textContent='Stopping and flushing video data…';} }
+function setRecordingUi(active){ const button=$('#recordButton');button.disabled=active?false:!state.screenStream;button.classList.toggle('stop',active);button.querySelector('span').textContent=active?'Stop & save':'Start recording';$('#statusPill').classList.toggle('recording',active);$('#statusPill span').textContent=active?'Recording':'Ready';clearInterval(state.timer);if(active){state.timer=setInterval(updateTimer,250);updateTimer();}else{$('#timer').textContent='00:00:00';} }
 function updateTimer(){const s=Math.floor((Date.now()-state.startedAt)/1000);$('#timer').textContent=[Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
-function resetSource(){if(state.recorder?.state==='recording')stopRecording();state.drawing=false;state.screenStream=null;canvas.style.display='none';$('#emptyState').classList.remove('hidden');$('#recordButton').disabled=true;$('#resolutionLabel').textContent='No source selected';$('#hint').textContent='Select a source to start recording';}
+function resetSource(){if(state.recorder?.state==='recording')stopRecording();state.drawing=false;state.screenStream=null;state.currentSource=null;canvas.style.display='none';$('#emptyState').classList.remove('hidden');$('#recordButton').disabled=true;$('#resolutionLabel').textContent='No source selected';if(!state.recordingId)$('#hint').textContent='Select a source to start recording';}
 async function stopTracks(stream){stream?.getTracks().forEach(track=>track.stop());}
 function escapeHtml(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML;}
 
 function updateRegionBox(){const box=$('#regionBox');if(!$('#regionToggle').checked||!state.screenStream){box.classList.add('hidden');return;}box.classList.remove('hidden');box.style.left=`${state.region.x*100}%`;box.style.top=`${state.region.y*100}%`;box.style.width=`${state.region.w*100}%`;box.style.height=`${state.region.h*100}%`;}
-$('#regionBox').addEventListener('pointerdown',e=>{e.preventDefault();const resize=e.target.tagName==='B';state.drag={resize,startX:e.clientX,startY:e.clientY,...state.region};$('#regionBox').setPointerCapture(e.pointerId);});
-$('#regionBox').addEventListener('pointermove',e=>{if(!state.drag)return;const rect=$('#stage').getBoundingClientRect(),dx=(e.clientX-state.drag.startX)/rect.width,dy=(e.clientY-state.drag.startY)/rect.height;if(state.drag.resize){state.region.w=Math.min(1-state.region.x,Math.max(.1,state.drag.w+dx));state.region.h=Math.min(1-state.region.y,Math.max(.1,state.drag.h+dy));}else{state.region.x=Math.min(1-state.region.w,Math.max(0,state.drag.x+dx));state.region.y=Math.min(1-state.region.h,Math.max(0,state.drag.y+dy));}updateRegionBox();});
-$('#regionBox').addEventListener('pointerup',()=>state.drag=null);
 
-$('#chooseSourceHero').onclick=openSources;$('#sourceButton').onclick=openSources;$('#refreshSources').onclick=openSources;$('#closeDialog').onclick=()=>$('#sourceDialog').close();$('#cameraToggle').onchange=toggleCamera;$('#regionToggle').onchange=updateRegionBox;$('#recordButton').onclick=()=>state.recorder?.state==='recording'?stopRecording():startRecording();window.addEventListener('beforeunload',()=>{stopTracks(state.screenStream);stopTracks(state.cameraStream);stopTracks(state.micStream);});
+async function toggleRegion(){
+  const toggle=$('#regionToggle');
+  if(!toggle.checked){updateRegionBox();return;}
+  if(!state.currentSource){toggle.checked=false;$('#hint').textContent='Choose an entire display before selecting a region';return;}
+  if(!state.currentSource.id.startsWith('screen')){toggle.checked=false;$('#hint').textContent='Region capture is available when an entire display is selected';return;}
+  toggle.disabled=true;$('#hint').textContent='Select the recording area on your screen';
+  try {
+    const region=await window.screenStudio.selectRegion(state.currentSource.id);
+    if(region){state.region=region;updateRegionBox();$('#hint').textContent='Region selected · ready to record';}
+    else {toggle.checked=false;updateRegionBox();$('#hint').textContent='Region selection canceled';}
+  } catch(error){toggle.checked=false;updateRegionBox();$('#hint').textContent=`Could not select region: ${error.message}`;}
+  finally {toggle.disabled=false;}
+}
+
+$('#chooseSourceHero').onclick=openSources;$('#sourceButton').onclick=openSources;$('#refreshSources').onclick=openSources;$('#closeDialog').onclick=()=>$('#sourceDialog').close();$('#cameraToggle').onchange=toggleCamera;$('#regionToggle').onchange=toggleRegion;$('#recordButton').onclick=()=>state.recorder?.state==='recording'?stopRecording():startRecording();window.addEventListener('beforeunload',()=>{stopTracks(state.screenStream);stopTracks(state.cameraStream);stopTracks(state.micStream);});
